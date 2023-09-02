@@ -118,11 +118,18 @@ const actualizarCarrito = () => {
 };
 
 const agregarProducto = (producto) => {
-  if (!carrito.find((item) => item.producto.nombre === producto.nombre)) {
+  const carritoItem = carrito.find(
+    (item) => item.producto.nombre === producto.nombre
+  );
+
+  if (carritoItem) {
+    carritoItem.cantidad++;
+  } else {
     carrito.push({ producto, cantidad: 1 });
-    guardarCarrito();
-    actualizarCarrito();
   }
+
+  guardarCarrito();
+  actualizarCarrito();
 };
 
 const finalizarPedido = () => {
@@ -133,20 +140,28 @@ const finalizarPedido = () => {
       0
     );
 
-    alert(
-      `¡Pedido finalizado! El Total es: $${total.toFixed(
-        2
-      )}. Gracias por su compra.`
-    );
+    Swal.fire({
+      icon: "success",
+      title: "¡Pedido finalizado!",
+      text: `El Total es: $${total} ¡Gracias por su compra!`,
+      confirmButtonText: "Aceptar",
+    });
     carrito = [];
     guardarCarrito();
     actualizarCarrito();
   } else {
-    alert(
-      "El carrito está vacío. Agrega productos antes de finalizar el pedido."
-    );
+    Swal.fire({
+      icon: "error",
+      title: "¡El carrito está vacío!",
+      text: "Agrega productos antes de finalizar el pedido.",
+    });
   }
 };
+
+ordenPrecio.innerHTML =
+  '<option value="" selected>Seleccionar</option>' +
+  '<option value="ascendente">Menor a Mayor</option>' +
+  '<option value="descendente">Mayor a Menor</option>';
 
 const filtrarProductosPorTipo = (tipo) => {
   const tipoSeleccionado = tipo.toLowerCase();
@@ -156,45 +171,49 @@ const filtrarProductosPorTipo = (tipo) => {
   mostrarProductos(productosFiltrados);
 };
 
-const ordenarProductosPorPrecio = (orden) => {
+const ordenarProductosPorPrecio = (orden, listaProductos = productos) => {
   const comparador =
     orden === "ascendente"
       ? (a, b) => a.precio - b.precio
       : (a, b) => b.precio - a.precio;
-  const productosOrdenados = [...productos].sort(comparador);
+  const productosOrdenados = [...listaProductos].sort(comparador);
   mostrarProductos(productosOrdenados);
 };
 
-const buscarProductosPorNombre = (nombre) => {
-  const productosEncontrados = productos.filter((producto) =>
-    producto.nombre.toLowerCase().includes(nombre)
+const buscarProductosPorNombre = (nombre, tipoSeleccionado) => {
+  const productosFiltrados = productos.filter(
+    (producto) =>
+      (tipoSeleccionado === "todos" || producto.tipo === tipoSeleccionado) &&
+      producto.nombre.toLowerCase().includes(nombre)
   );
-  mostrarProductos(productosEncontrados);
+
+  mostrarProductos(productosFiltrados);
 };
 
 const mostrarProductos = (productosMostrados) => {
   productosContainer.innerHTML = "";
 
   productosMostrados.forEach((producto) => {
-    const productoContainer = document.createElement("div");
-    productoContainer.className = "producto-container";
+    productosContainer.innerHTML += `
+      <div class="producto-container">
+        <h3>${producto.nombre}</h3>
+        <p>$${producto.precio.toFixed(2)}</p>
+        <button class="agregar-button" data-producto="${
+          producto.nombre
+        }">Agregar al carrito</button>
+      </div>
+    `;
+  });
 
-    const productNombre = document.createElement("h3");
-    productNombre.innerText = producto.nombre;
-    productoContainer.appendChild(productNombre);
-
-    const productPrecio = document.createElement("p");
-    productPrecio.innerText = `$${producto.precio.toFixed(2)}`;
-    productoContainer.appendChild(productPrecio);
-
-    const btnAgregar = document.createElement("button");
-    btnAgregar.innerHTML = "Agregar al carrito";
-    btnAgregar.addEventListener("click", () => {
-      agregarProducto(producto);
+  const agregarButtons = document.querySelectorAll(".agregar-button");
+  agregarButtons.forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const nombreProducto = event.target.getAttribute("data-producto");
+      const productoSeleccionado = productos.find(
+        (producto) => producto.nombre === nombreProducto
+      );
+      agregarProducto(productoSeleccionado);
     });
-
-    productoContainer.appendChild(btnAgregar);
-    productosContainer.appendChild(productoContainer);
   });
 };
 
@@ -222,24 +241,57 @@ productos.forEach((producto) => {
 
 finalizarPedidoButton.addEventListener("click", finalizarPedido);
 vaciarCarritoButton.addEventListener("click", () => {
-  carrito = [];
-  guardarCarrito();
-  actualizarCarrito();
+  Swal.fire({
+    title: "¿ Deseas vaciar el carrito?",
+    text: "¿Estás seguro?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Sí, vaciar carrito",
+    cancelButtonText: "Cancelar",
+    cancelButtonColor: "#d33",
+  }).then((result) => {
+    if (result.isConfirmed) {
+      carrito = [];
+      guardarCarrito();
+      actualizarCarrito();
+      Swal.fire({
+        icon: "success",
+        title: "Carrito vacío",
+        text: "Tu carrito ha sido vaciado exitosamente.",
+      });
+    }
+  });
 });
 
 filtroTipo.addEventListener("change", () => {
   const tipoSeleccionado = filtroTipo.value;
-  filtrarProductosPorTipo(tipoSeleccionado);
+  const nombreProducto = busquedaProducto.value.toLowerCase();
+  buscarProductosPorNombre(nombreProducto, tipoSeleccionado);
 });
 
 ordenPrecio.addEventListener("change", () => {
+  const tipoSeleccionado = filtroTipo.value;
   const ordenSeleccionado = ordenPrecio.value;
-  ordenarProductosPorPrecio(ordenSeleccionado);
+
+  if (tipoSeleccionado === "todos") {
+    ordenarProductosPorPrecio(ordenSeleccionado, productos);
+  } else {
+    const productosFiltrados = productos.filter(
+      (producto) => producto.tipo === tipoSeleccionado
+    );
+    ordenarProductosPorPrecio(ordenSeleccionado, productosFiltrados);
+  }
 });
 
 buscarButton.addEventListener("click", () => {
   const nombreProducto = busquedaProducto.value.toLowerCase();
   buscarProductosPorNombre(nombreProducto);
+});
+
+busquedaProducto.addEventListener("input", () => {
+  const tipoSeleccionado = filtroTipo.value;
+  const nombreProducto = busquedaProducto.value.toLowerCase();
+  buscarProductosPorNombre(nombreProducto, tipoSeleccionado);
 });
 
 actualizarCarrito();
